@@ -3,6 +3,8 @@
 A tiny canvas experiment — thousands of particles orbit a glowing core,
 forming a spiral galaxy. Move your mouse to warp spacetime. 🌌
 
+live link - https://abhinav-836.github.io/Particle-Galaxy-animation/
+
 ![preview](./preview.png)
 
 ## ✨ Features
