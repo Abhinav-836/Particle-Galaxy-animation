@@ -1,21 +1,62 @@
-The MIT License (MIT)
 
-Copyright (c) 2025 Facundo Sencar (https://codepen.io/Facundo-Sencar/pen/emYajdo)
+---
 
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
+## 📸 Add a Preview Screenshot *(makes repo card look 10x better)*
 
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
+1. Open your live site
+2. Take a screenshot (full browser window)
+3. Save it as `preview.png`
+4. Upload it to the same repo folder
+5. The README will auto-show it ✨
 
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
+---
+
+## 🚀 How To Update Your Existing GitHub Repo *(web upload, no terminal)*
+
+Since you already uploaded via the website:
+
+1. Go to your repo on **github.com**
+2. Click on each file → **pencil icon** (Edit) → paste the new contents → **Commit changes**
+   - Do this for `index.html`, `style.css`, `script.js`
+3. For `README.md`:
+   - Click **Add file → Create new file**
+   - Name it `README.md` → paste contents → Commit
+4. For `preview.png`:
+   - Click **Add file → Upload files** → drag the screenshot → Commit
+5. Wait ~1 minute → refresh `https://YOUR-USERNAME.github.io/YOUR-REPO/`
+
+> ⚠️ If you see the **old heart animation**, do a **hard refresh** (`Ctrl + Shift + R` / `Cmd + Shift + R`). GitHub Pages caches aggressively.
+
+---
+
+## 🎛️ Fun Things To Tweak (try these!)
+
+In `script.js`, change `CONFIG`:
+
+| Change | Effect |
+|--------|--------|
+| `particleCount: 5000` | Denser, richer galaxy |
+| `arms: 2` | Classic two-arm spiral |
+| `arms: 6` | Flower-like pattern |
+| `spin: 0.4` | Fast whirling |
+| `colorInner: [255, 100, 200]` | Pink/neon core |
+| `colorOuter: [80, 255, 180]` | Green outer arms |
+| `mouseForce: 4` | Mouse violently repels stars |
+
+---
+
+## ✅ What You End Up With
+
+- A repo that **looks like a real graphics project**
+- Something **interactive** (people play with the mouse)
+- **Zero dependencies** — pure HTML/CSS/JS
+- Works on **mobile too**
+- A **README** that makes the repo card look pro on your GitHub profile
+
+Once you push it, reply here and tell me — I can help you:
+- Add a **loading fade-in**
+- Add a **"click to supernova"** burst effect
+- Add a **nebula color layer** behind the galaxy
+- Or tune it to look a specific way
+
+Enjoy your first real GitHub project 🚀
