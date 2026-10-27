@@ -10,9 +10,12 @@ body {
 
 canvas {
   position: absolute;
+  inset: 0;
   width: 100%;
   height: 100%;
   display: block;
+  /* Let a finger drag push the stars instead of scrolling or zooming the page */
+  touch-action: none;
 }
 
 /* subtle vignette for depth */
@@ -26,4 +29,12 @@ body::after {
     rgba(0, 0, 0, 0) 40%,
     rgba(0, 0, 0, 0.55) 100%
   );
+}
+
+.noscript {
+  position: relative;
+  z-index: 1;
+  margin: 2rem;
+  color: #c8d8ff;
+  font: 16px/1.5 system-ui, sans-serif;
 }
