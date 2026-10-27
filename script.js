@@ -1,122 +1,137 @@
 /* ============================================================
    PARTICLE GALAXY
    - Thousands of particles orbiting a glowing core
-   - Each particle has its own radius, angle, speed, color
-   - Mouse pushes particles (repulsion / gravity well)
-   - Everything is pure vanilla JS, no libraries
+   - Each particle has its own place on a spiral arm, size and color
+   - Mouse / finger pushes particles away (repulsion field)
+   - Respects "reduce motion" accessibility settings
+   - Pure vanilla JS, no libraries
    ============================================================ */
 
 (function () {
-  const canvas = document.getElementById("pinkboard");
+  "use strict";
+
+  const canvas = document.getElementById("galaxy");
   const ctx = canvas.getContext("2d");
 
+  // ---------- Settings (tweak these) ----------
+  const CONFIG = {
+    particleCount: 2200,          // how many stars
+    arms: 4,                      // spiral arms
+    coreRadius: 40,               // empty center radius (at 1000px screen)
+    maxRadius: 520,               // outer edge (at 1000px screen)
+    spin: 0.012,                  // rotation speed of the whole galaxy
+    colorInner: [255, 220, 160],  // warm core color
+    colorOuter: [120, 180, 255],  // cool outer color
+    bgStars: 180,                 // tiny background stars
+    mouseRadius: 180,             // how far the pointer affects particles
+    mouseForce: 1.6,              // how strongly the pointer pushes
+    reducedMotionSpeed: 0.1       // speed multiplier when "reduce motion" is on
+  };
+
+  // ---------- State ----------
   let W = 0;
   let H = 0;
   let cx = 0;
   let cy = 0;
-  let dpr = Math.min(window.devicePixelRatio || 1, 2);
+  let dpr = 1;
+  let coreR = 0;
+  let maxR = 0;
 
-  // Mouse state
-  const mouse = { x: 0, y: 0, active: false };
-
-  // Galaxy settings
-  const CONFIG = {
-    particleCount: 2200,      // how many stars
-    arms: 4,                  // spiral arms
-    coreRadius: 40,           // empty center radius
-    maxRadius: 520,           // outer edge
-    spin: 0.12,               // base rotation speed
-    colorInner: [255, 220, 160], // warm core color
-    colorOuter: [120, 180, 255], // cool outer color
-    bgStars: 180,             // tiny background stars
-    mouseRadius: 180,         // how far mouse affects particles
-    mouseForce: 1.6           // how strongly mouse pushes
-  };
-
-  // Particle pool
+  const pointer = { x: 0, y: 0, active: false };
   let particles = [];
   let bgStars = [];
 
+  const motionQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
+  let speedFactor = motionQuery.matches ? CONFIG.reducedMotionSpeed : 1;
+  const onMotionChange = (e) => {
+    speedFactor = e.matches ? CONFIG.reducedMotionSpeed : 1;
+  };
+  if (motionQuery.addEventListener) motionQuery.addEventListener("change", onMotionChange);
+  else if (motionQuery.addListener) motionQuery.addListener(onMotionChange); // older Safari
+
   // ---------- Setup / Resize ----------
+  // Particles store their orbit as a 0..1 fraction (t), and background stars
+  // store 0..1 screen coordinates, so a resize only rescales the scene. It no
+  // longer rebuilds it, which made the galaxy "jump" every time a phone's
+  // address bar slid in or out.
   function resize() {
     W = window.innerWidth;
     H = window.innerHeight;
-    canvas.width = W * dpr;
-    canvas.height = H * dpr;
+    dpr = Math.min(window.devicePixelRatio || 1, 2); // re-read: monitor may have changed
+    canvas.width = Math.round(W * dpr);
+    canvas.height = Math.round(H * dpr);
     canvas.style.width = W + "px";
     canvas.style.height = H + "px";
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
     cx = W / 2;
     cy = H / 2;
-    buildGalaxy();
-    buildBgStars();
+    // Size relative to a 1000px screen, never smaller than 0.55 so small
+    // laptops still get a big galaxy, but always narrow enough to fit the
+    // width (on phones the 0.55 floor alone pushed the arms off-screen).
+    const scale = Math.min(
+      Math.max(Math.min(W, H) / 1000, 0.55),
+      (W * 0.47) / CONFIG.maxRadius
+    );
+    maxR = CONFIG.maxRadius * scale;
+    coreR = CONFIG.coreRadius * scale;
+
+    ctx.fillStyle = "#03040a";
+    ctx.fillRect(0, 0, W, H);
   }
 
-  // ---------- Build the galaxy ----------
+  // ---------- Build the galaxy (once) ----------
+  function mixColor(t) {
+    const a = CONFIG.colorInner;
+    const b = CONFIG.colorOuter;
+    const r = Math.round(a[0] * (1 - t) + b[0] * t);
+    const g = Math.round(a[1] * (1 - t) + b[1] * t);
+    const bl = Math.round(a[2] * (1 - t) + b[2] * t);
+    return `rgba(${r},${g},${bl},`;
+  }
+
   function buildGalaxy() {
     particles = [];
-    const scale = Math.min(W, H) / 1000; // keep galaxy fitting on any screen
-    const maxR = CONFIG.maxRadius * Math.max(scale, 0.55);
-    const coreR = CONFIG.coreRadius * Math.max(scale, 0.55);
-
     for (let i = 0; i < CONFIG.particleCount; i++) {
-      // Distance from center — denser near core, sparse at edges
+      // Distance from center as a 0..1 fraction: denser near the core
       const t = Math.pow(Math.random(), 0.65);
-      const radius = coreR + t * (maxR - coreR);
 
       // Which spiral arm
       const arm = Math.floor(Math.random() * CONFIG.arms);
       const armOffset = (arm / CONFIG.arms) * Math.PI * 2;
 
-      // Spiral twist — further out = more twist
-      const twist = (radius / maxR) * 3.2;
-
-      // Slight randomness so it doesn't look too perfect
-      const scatter = (Math.random() - 0.5) * 0.35;
-
-      const angle = armOffset + twist + scatter;
-
-      // Orbital speed — inner faster (like real galaxies)
-      const speed =
-        (CONFIG.spin * (1 - t * 0.7) + Math.random() * 0.02) *
-        (Math.random() < 0.5 ? 1 : 1);
-
-      // Color: blend inner -> outer
-      const mix = t;
-      const r = Math.round(
-        CONFIG.colorInner[0] * (1 - mix) + CONFIG.colorOuter[0] * mix
-      );
-      const g = Math.round(
-        CONFIG.colorInner[1] * (1 - mix) + CONFIG.colorOuter[1] * mix
-      );
-      const b = Math.round(
-        CONFIG.colorInner[2] * (1 - mix) + CONFIG.colorOuter[2] * mix
-      );
+      // Spiral twist (further out = more twist) plus a little scatter
+      const twist = t * 3.2;
+      const scatter = (Math.random() - 0.5) * 0.5;
 
       particles.push({
-        radius,
-        angle,
-        speed,
+        t,
+        angle: armOffset + twist + scatter,
+        // Each star drifts a little back and forth along its arm. The whole
+        // galaxy turns as one, so the arms keep their shape. (When inner
+        // stars orbited ~3x faster, the arms wound up into plain rings
+        // within a few seconds.)
+        drift: 0.04 + Math.random() * 0.08,
+        driftPhase: Math.random() * Math.PI * 2,
+        driftSpeed: 0.0004 + Math.random() * 0.0008,
         size: Math.random() * 1.6 + 0.4,
-        color: `rgba(${r},${g},${b},`,
-        baseAlpha: 0.5 + Math.random() * 0.5,
-        // offset for mouse displacement
-        dx: 0,
+        color: mixColor(t),
+        // Dimmer toward the edge for a sense of depth
+        alpha: Math.max(0.15, (0.5 + Math.random() * 0.5) * (1 - t * 0.75)),
+        dx: 0, // pointer displacement
         dy: 0,
-        // small vertical wobble so it's not flat
-        wobble: Math.random() * Math.PI * 2,
+        wobble: Math.random() * Math.PI * 2, // small vertical drift
         wobbleSpeed: 0.0006 + Math.random() * 0.001
       });
     }
   }
 
-  // ---------- Tiny background stars (static) ----------
   function buildBgStars() {
     bgStars = [];
     for (let i = 0; i < CONFIG.bgStars; i++) {
       bgStars.push({
-        x: Math.random() * W,
-        y: Math.random() * H,
+        x: Math.random(),
+        y: Math.random(),
         r: Math.random() * 0.8 + 0.2,
         a: Math.random() * 0.6 + 0.2,
         twinkle: Math.random() * Math.PI * 2,
@@ -125,23 +140,18 @@
     }
   }
 
-  // ---------- Draw the glowing core ----------
+  // ---------- Glowing core ----------
   function drawCore() {
-    const scale = Math.min(W, H) / 1000;
-    const coreR = CONFIG.coreRadius * Math.max(scale, 0.55);
-
-    // Outer glow
-    const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, coreR * 6);
-    grad.addColorStop(0, "rgba(255, 240, 200, 0.55)");
-    grad.addColorStop(0.15, "rgba(255, 180, 120, 0.28)");
-    grad.addColorStop(0.4, "rgba(120, 140, 255, 0.12)");
-    grad.addColorStop(1, "rgba(0, 0, 0, 0)");
-    ctx.fillStyle = grad;
+    const glow = ctx.createRadialGradient(cx, cy, 0, cx, cy, coreR * 6);
+    glow.addColorStop(0, "rgba(255, 240, 200, 0.55)");
+    glow.addColorStop(0.15, "rgba(255, 180, 120, 0.28)");
+    glow.addColorStop(0.4, "rgba(120, 140, 255, 0.12)");
+    glow.addColorStop(1, "rgba(0, 0, 0, 0)");
+    ctx.fillStyle = glow;
     ctx.beginPath();
     ctx.arc(cx, cy, coreR * 6, 0, Math.PI * 2);
     ctx.fill();
 
-    // Bright inner core
     const inner = ctx.createRadialGradient(cx, cy, 0, cx, cy, coreR * 0.9);
     inner.addColorStop(0, "rgba(255, 255, 255, 1)");
     inner.addColorStop(0.5, "rgba(255, 230, 180, 0.9)");
@@ -154,95 +164,92 @@
 
   // ---------- Main render loop ----------
   let last = performance.now();
+  let rotation = 0; // shared rotation of the whole galaxy
+  const TAU = Math.PI * 2;
 
   function render(now) {
     requestAnimationFrame(render);
 
-    const dt = Math.min(now - last, 50); // cap so tab-switch doesn't explode
+    // Cap the step so returning to a background tab doesn't jump
+    const dt = Math.min(now - last, 50) * speedFactor;
     last = now;
 
-    // Fade-trail background instead of full clear -> soft motion blur
+    // Translucent fill instead of a full clear -> soft motion trails
     ctx.fillStyle = "rgba(3, 4, 10, 0.28)";
     ctx.fillRect(0, 0, W, H);
 
-    // Draw background stars (with twinkle)
+    // Background stars (twinkling)
     for (let i = 0; i < bgStars.length; i++) {
       const s = bgStars[i];
       s.twinkle += s.twinkleSpeed * dt;
-      const a = s.a * (0.6 + 0.4 * Math.sin(s.twinkle));
-      ctx.fillStyle = `rgba(200, 220, 255, ${a})`;
+      ctx.fillStyle = `rgba(200, 220, 255, ${s.a * (0.6 + 0.4 * Math.sin(s.twinkle))})`;
       ctx.beginPath();
-      ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
+      ctx.arc(s.x * W, s.y * H, s.r, 0, TAU);
       ctx.fill();
     }
 
-    // Core glow
     drawCore();
 
-    // Update + draw particles
+    rotation += CONFIG.spin * (dt / 16.67);
+    const mr = CONFIG.mouseRadius;
+    const push = CONFIG.mouseForce * 18 * 0.15;
+
     for (let i = 0; i < particles.length; i++) {
       const p = particles[i];
 
-      // Orbit
-      p.angle += p.speed * (dt / 16.67);
       p.wobble += p.wobbleSpeed * dt;
+      p.driftPhase += p.driftSpeed * dt;
 
-      // Base position
-      let px = cx + Math.cos(p.angle) * p.radius;
-      let py = cy + Math.sin(p.angle) * p.radius * 0.55; // squash -> disc shape
+      const angle = p.angle + rotation + Math.sin(p.driftPhase) * p.drift;
+      const radius = coreR + p.t * (maxR - coreR);
+      let px = cx + Math.cos(angle) * radius;
+      let py = cy + Math.sin(angle) * radius * 0.55 + Math.sin(p.wobble) * 6; // flattened disc
 
-      // Vertical wobble for depth
-      py += Math.sin(p.wobble) * 6;
-
-      // Mouse interaction — push away from cursor
-      if (mouse.active) {
-        const mdx = px - mouse.x;
-        const mdy = py - mouse.y;
+      // Pointer pushes nearby stars away
+      if (pointer.active) {
+        const mdx = px - pointer.x;
+        const mdy = py - pointer.y;
         const dist = Math.sqrt(mdx * mdx + mdy * mdy);
-        if (dist < CONFIG.mouseRadius && dist > 0.01) {
-          const force =
-            (1 - dist / CONFIG.mouseRadius) * CONFIG.mouseForce * 18;
-          p.dx += (mdx / dist) * force * 0.15;
-          p.dy += (mdy / dist) * force * 0.15;
+        if (dist < mr && dist > 0.01) {
+          const force = (1 - dist / mr) * push;
+          p.dx += (mdx / dist) * force;
+          p.dy += (mdy / dist) * force;
         }
       }
 
-      // Spring back to rest
+      // Spring back toward the orbit
       p.dx *= 0.92;
       p.dy *= 0.92;
-      px += p.dx;
-      py += p.dy;
 
-      // Alpha fades with distance from core
-      const depth = 1 - p.radius / (CONFIG.maxRadius + 200);
-      const alpha = Math.max(0.15, p.baseAlpha * depth);
-
-      ctx.fillStyle = p.color + alpha + ")";
+      ctx.fillStyle = p.color + p.alpha + ")";
       ctx.beginPath();
-      ctx.arc(px, py, p.size, 0, Math.PI * 2);
+      ctx.arc(px + p.dx, py + p.dy, p.size, 0, TAU);
       ctx.fill();
     }
   }
 
-  // ---------- Mouse / touch ----------
-  function onMove(x, y) {
-    mouse.x = x;
-    mouse.y = y;
-    mouse.active = true;
+  // ---------- Pointer (mouse, pen and touch) ----------
+  function setPointer(x, y) {
+    pointer.x = x;
+    pointer.y = y;
+    pointer.active = true;
+  }
+  function clearPointer() {
+    pointer.active = false;
   }
 
-  window.addEventListener("mousemove", (e) => onMove(e.clientX, e.clientY));
-  window.addEventListener("mouseleave", () => (mouse.active = false));
-  window.addEventListener(
-    "touchmove",
-    (e) => {
-      if (e.touches[0]) onMove(e.touches[0].clientX, e.touches[0].clientY);
-    },
-    { passive: true }
-  );
-  window.addEventListener("touchend", () => (mouse.active = false));
+  window.addEventListener("pointermove", (e) => setPointer(e.clientX, e.clientY), { passive: true });
+  window.addEventListener("pointerdown", (e) => setPointer(e.clientX, e.clientY), { passive: true });
+  window.addEventListener("pointerup", (e) => {
+    if (e.pointerType !== "mouse") clearPointer(); // a lifted finger stops pushing
+  });
+  window.addEventListener("pointercancel", clearPointer);
+  // "mouseleave" never fires on window; the document element gets it when
+  // the cursor leaves the page, so the push field turns off as intended.
+  document.documentElement.addEventListener("mouseleave", clearPointer);
+  window.addEventListener("blur", clearPointer);
 
-  // ---------- Resize handling ----------
+  // ---------- Resize ----------
   let resizeTimer;
   window.addEventListener("resize", () => {
     clearTimeout(resizeTimer);
@@ -250,6 +257,8 @@
   });
 
   // ---------- Boot ----------
+  buildGalaxy();
+  buildBgStars();
   resize();
   requestAnimationFrame(render);
 })();
